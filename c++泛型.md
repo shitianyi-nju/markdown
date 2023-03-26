@@ -422,5 +422,176 @@ arrayType<double> b
 - **函数对象**：类似于函数的对象，可以是某个函数指针，也可以是一个类对象（重载()）
 - **算法**：完成特定任务的方法。(搜索，排序，转换等)
 
+### 迭代器
+
+理解了迭代器才理解了STL的关键。
+
+模板可以使用户编写独立于数据类型的代码，而迭代器使得算法可以独立于使用的容器。
+
+~~~c++
+//在array数组找到值 = val
+double * find_dr(double *arr, int n, const double & val) {
+    for (int i = 0; i < n; i++) {
+        if (arr[i] == val) {
+            return &arr[i];
+        }
+    }
+
+    return nullptr;
+}
+
+struct Node {
+    double ele;
+    Node *next;
+};
+
+//在node数组中找到val
+Node* find_nd(Node *head, const double &val) {
+    Node *start;
+    for (start = head; start != nullptr; start = start->next) {
+        if (start->ele == val) {
+            return start;
+        }
+    }
+
+    return nullptr;
+}
+~~~
+
+两个算法的本质都是遍历容器，查找和容器内值相等的数据，但实现上存在很大的差异。
+
+能否找到一个通用的`find`方法，同时支持数组和链表或者其他容器类型，可以遍历容器内的数据，并且将遍历的值进行通用表示。
+
+迭代器就是这样一个遍历对象（有点像java的iterator)
+
+满足上述查找算法的迭代器特征：
+
+- 通过迭代器访问数值（类比指针，如果p是指针，可通过*p访问指针数据）
+- 迭代器之间能够相互赋值，且支持比较操作（p = q，p == q, p != q)
+- 能够遍历容器元素，支持p++或者++p的行为来使得迭代器在元素间移动。
+
+~~~c++
+//在array数组找到值 = val
+using iterator = double *
+iterator find_dr(iterator begin, iterator end, const double & val) {
+    for (int i = begin; i < end; i++) {
+        if (*i == val) {
+            return i;
+        }
+    }
+
+    return end;
+}
+
+struct Node {
+    double ele;
+    Node *next;
+};
+
+class Node1 {
+private:
+    double ele;
+    Node1 *next;
+    Node1 *current;
+public:
+    Node1():ele(0.0), next(nullptr), current(this){};
+    Node1(double &val) : ele(val), next(nullptr), current(this){}
+    double operator*()  {return ele;}
+    Node1 &operator++()  {
+        if (current->next != nullptr) {
+            current = current->next;
+            return *current;
+        }
+      
+      	return nullptr;
+    }
+
+    bool operator==(Node1 *n) {
+        return current == n;
+    }
+  
+  	bool operator!=(Node1 *n) {
+      	return !operator==(n);
+    }
+};
+
+using iterator1 = Node1 *;
+iterator1 find_nd(iterator1 head, const double &val) {
+  	iterator1 start;
+  	for (start = head; start != nullptr; start++) {
+      	if (*start == val) {
+          return start;
+        }
+    }
+}
+~~~
+
+​	每个容器分别为自己的数据定义了不用的迭代器类型，某个容器的迭代器可能是指针，某个容器的迭代器可能是类对象。但是他们都实现了*，++，获取头元素(begin())，获取超尾元素(end())的方法，每个容器再操作对应的迭代器从头指向超尾，实现容器的遍历。
+
+​	我们在使用容器时，无需知道迭代器是如何实现的，只需要知道它有迭代器，且能通过容器的通用方法（`::iterator`，`begin`, `end`)来获取。
+
+~~~c++
+vector<double> v1;
+
+vector<double>::iterator iter;
+for (iter = v1.begin(); iter != v1.end(); iter++) {
+	//...
+}
+~~~
+
+
+
 ### 容器
 
+STL具有容器概念和容器类型。概念是具有名称（如容器、序列容器、关联容器等）的通用类别；容器类型是可用于创建具体容器对象的模板。C++11以前的容器类型分别是`deque`、`list`、`queue`、`priority_queue`、`stack`、`vector`、`map`、`multimap`、`set`、`multiset`和`bitset`；C++11新增了`forward_list`、`unordered_map`、`unordered_multimap`、`unordered_set`和`unordered_multiset`
+
+| 容器类型       | 实现     | 容器概念 |
+| -------------- | -------- | -------- |
+| deque          | 双端队列 |          |
+| list           | 双向链表 |          |
+| priproty_queue | 双向链表 |          |
+| stack          | 栈       |          |
+| vector         |          |          |
+| map            |          |          |
+| multimap       |          |          |
+| set            |          |          |
+| multiset       |          |          |
+
+#### 容器概念
+
+容器概念描述了所有容器都通用的元素，是一个概念化的抽象类，指定了所有STL容器类必须满足的一系列要求。
+
+容器概念的必要要求：容器内存储的对象必须是同一类型的，可以存储内置对象，也可存储OOP对象，容器过期则数据过期（指针除外）;存储进容器的对象，必须支持可赋值和可拷贝构造（基本类型，未将拷贝构造和赋值设置为私有的OOP类型）
+
+所有的容器都必须提供某些特征和操作。
+
+容器通用特征总结：（“X表示容器类型，如vector；T表示存储在容器中的对象类型；a和b表示类型为X的值；r表示类型为X&的值；u表示类型为X的标识符（即如果X表示`vector<int>`，则u是一个`vector<int>`对象，rv代表X的非常量右值）” 
+
+| 表达式        | 返回类型                  | 说明                                             | 时间复杂度   |
+| ------------- | ------------------------- | ------------------------------------------------ | ------------ |
+| X::iterator   | 返回指向X元素的迭代器类型 | 满足正向迭代器要求                               | O(1)         |
+| X::value_type | T                         | T的类型                                          | O(1)         |
+| X u           | X                         | 创建一个空的容器                                 | O(1)         |
+| X()           | X                         | 创建一个匿名空容器                               | O(1)         |
+| X u(a)        | X                         | 调用容器的拷贝构造函数创建新的容器               | O(n)         |
+| X u = a       | X                         | 同X u(a)                                         | O(n)         |
+| r = a         | X &                       | 调用容器的赋值重载符                             | O(n)         |
+| a.begin()     | 返回指向X元素的迭代器类型 | 返回指向容器第一个元素的迭代器                   | O(1)         |
+| a.end()       | 返回指向X元素的迭代器类型 | 返回指向容器最后一个元素下一个（超尾值）的迭代器 | O(1)         |
+| a.size()      | int                       | 返回容器内元素的个数                             | O(1)         |
+| a.swap(b)     | void                      | 交换a和b的内容                                   | O(1) or O(n) |
+| a == b        | bool                      | a和b长度相同且每个元素都相等，返回true           | O(n)         |
+| a != b        | bool                      | !(a == b)                                        | O(n)         |
+| X u(rv)       | X                         | 移动构造（ C++11）                               | O(n)         |
+| X u = rv      | X                         | 移动构造（ C++11)                                | O(n)         |
+| a = rv        | X                         | 移动复制（ C++11）                               | O(n)         |
+| a.cbegin()    | const_interator           | 返回指向第一个元素的const迭代器                  | O(1)         |
+| a.cend()      | const_interator           | 返回指向超尾的const迭代器                        | O(1)         |
+
+注：容器迭代器必须满足正向迭代器，容器必须是序列容器。
+
+##### 序列容器
+
+序列概念增加了迭代器至少是正向迭代器这样的要求，这保证了元素将按特定顺序排列，不会在两次迭代之间发生变化。array也被归类到序列容器，虽然它并不满足序列的所有要求。
+
+deque、forward_list、list、queue、priority_queue、stack和vector都是序列容器。
